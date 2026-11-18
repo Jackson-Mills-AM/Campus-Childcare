@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Childcare in California</title>
+<meta name="description" content="Draft data visualization: who runs childcare at California's 33 public university campuses, after UCLA announced it will close its program.">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f6f5f2;
+    --surface-1: #fcfcfb;
+    --border: #e2e0da;
+    --grid: #ebe9e4;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #6f6e69;
+    --accent-ink: #1c5cab;
+    --series-1: #2a78d6;   /* university-run */
+    --series-2: #eb6834;   /* student government / campus auxiliary */
+    --series-3: #1baf7a;   /* private contractor */
+    --neutral: #a8a69f;    /* mixed / unconfirmed */
+    --none: transparent;   /* no center */
+    --stripe: rgba(255,255,255,.55);
+    --critical: #d03b3b;
+    --draft-bg: #fff4d6;
+    --draft-ink: #6b4a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #33332f;
+      --grid: #2a2a27;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #9a998f;
+      --accent-ink: #86b6ef;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --neutral: #6e6d66;
+      --stripe: rgba(0,0,0,.45);
+      --critical: #e66767;
+      --draft-bg: #3a2f12;
+      --draft-ink: #f3d58a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --border: #33332f; --grid: #2a2a27;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a998f; --accent-ink: #86b6ef;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --neutral: #6e6d66;
+    --stripe: rgba(0,0,0,.45); --critical: #e66767; --draft-bg: #3a2f12; --draft-ink: #f3d58a;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--accent-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+
+  .draft {
+    background: var(--draft-bg); color: var(--draft-ink);
+    font-size: 13px; font-weight: 600; text-align: center; padding: 8px 16px;
+  }
+  header { padding: 40px 0 8px; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); margin: 0 0 8px; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(28px, 5vw, 42px); line-height: 1.12; margin: 0 0 14px; letter-spacing: -.01em; }
+  .dek { font-size: 19px; color: var(--text-secondary); margin: 0 0 12px; max-width: 720px; }
+  .byline { font-size: 14px; color: var(--text-muted); margin: 0; }
+
+  section { margin: 36px 0; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 0 0 6px; }
+  .sub { color: var(--text-secondary); margin: 0 0 18px; max-width: 720px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .note { font-size: 13px; color: var(--text-muted); margin: 12px 0 0; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .num { font-size: 32px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile .lbl { font-size: 14px; color: var(--text-secondary); margin-top: 6px; }
+  .tile .src { font-size: 12px; margin-top: 8px; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 18px; padding: 0; list-style: none; font-size: 14px; color: var(--text-secondary); }
+  .legend li { display: flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; }
+  .sw.university { background: var(--series-1); }
+  .sw.student { background: var(--series-2); }
+  .sw.contract { background: var(--series-3); }
+  .sw.mixed { background: var(--neutral); }
+  .sw.none { background: transparent; border: 1.5px dashed var(--text-muted); }
+  .sw.infant { background: repeating-linear-gradient(135deg, var(--text-muted) 0 2px, transparent 2px 5px); border: 1px solid var(--text-muted); }
+
+  /* composition bars */
+  .sys { margin: 0 0 26px; }
+  .sys:last-child { margin-bottom: 0; }
+  .sys-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .sys-head h3 { font-size: 16px; margin: 0; }
+  .sys-head span { font-size: 13px; color: var(--text-muted); }
+  .stack { display: flex; gap: 2px; height: 34px; }
+  .seg {
+    height: 100%; min-width: 6px; border-radius: 4px; position: relative; cursor: default;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;
+    outline-offset: 2px;
+  }
+  .seg.university { background: var(--series-1); }
+  .seg.student { background: var(--series-2); }
+  .seg.contract { background: var(--series-3); }
+  .seg.mixed { background: var(--neutral); }
+  .seg.none { background: transparent; border: 1.5px dashed var(--text-muted); color: var(--text-secondary); }
+  .seg:hover, .seg:focus-visible { filter: brightness(1.08); }
+  .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 20px; margin-top: 14px; }
+  .group h4 { font-size: 13px; font-weight: 700; margin: 0 0 6px; display: flex; align-items: center; gap: 7px; color: var(--text-primary); }
+  .group h4 .count { color: var(--text-muted); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: inherit; font-size: 13px; line-height: 1.2; padding: 5px 9px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface-0); color: var(--text-primary); cursor: pointer;
+  }
+  .chip:hover, .chip:focus-visible { border-color: var(--text-secondary); }
+  .chip .flag { color: var(--critical); font-weight: 700; }
+
+  /* capacity bars */
+  .bars { display: grid; grid-template-columns: minmax(112px, 168px) 1fr; gap: 6px 12px; align-items: center; }
+  .bars .name { font-size: 14px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bars .name .flag { color: var(--critical); font-weight: 700; font-size: 12px; }
+  .track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .bar { display: flex; gap: 2px; height: 20px; }
+  .bar span { height: 100%; display: block; }
+  .bar span:first-child { border-radius: 4px 0 0 4px; }
+  .bar span:last-child { border-radius: 0 4px 4px 0; }
+  .bar span:only-child { border-radius: 0 4px 4px 0; }
+  .bar.university span { background: var(--series-1); }
+  .bar.student span { background: var(--series-2); }
+  .bar.contract span { background: var(--series-3); }
+  .bar.mixed span { background: var(--neutral); }
+  .bar span.inf { background-image: repeating-linear-gradient(135deg, var(--stripe) 0 3px, transparent 3px 7px); }
+  .val { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .axis { grid-column: 2; display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--grid); padding-top: 4px; }
+  .missing { margin-top: 16px; font-size: 13px; color: var(--text-muted); }
+
+  /* lookup */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .controls input, .controls select {
+    font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  }
+  .controls input { flex: 1 1 220px; min-width: 0; }
+  .count-line { font-size: 13px; color: var(--text-muted); margin: 0 0 8px; }
+  .list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface-1); }
+  details { border-top: 1px solid var(--border); }
+  details:first-child { border-top: 0; }
+  summary {
+    list-style: none; cursor: pointer; padding: 12px 16px;
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { background: var(--surface-0); }
+  summary .cn { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  summary .cs { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  summary .ct { font-size: 13px; color: var(--text-secondary); grid-column: 1; }
+  summary .chev { grid-row: 1 / span 2; grid-column: 2; color: var(--text-muted); transition: transform .15s; }
+  details[open] summary .chev { transform: rotate(90deg); }
+  details[open] summary { background: var(--surface-0); }
+  dl { margin: 0; padding: 4px 16px 16px; display: grid; grid-template-columns: 170px 1fr; gap: 8px 16px; font-size: 14px; }
+  dt { color: var(--text-muted); font-weight: 600; }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  dd ul { margin: 0; padding-left: 18px; }
+  .flash { animation: flash 1.4s ease-out; }
+  @keyframes flash { from { background: var(--draft-bg); } to { background: transparent; } }
+
+  /* tooltip */
+  .tip {
+    position: fixed; z-index: 10; pointer-events: none; max-width: 260px;
+    background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.4;
+    box-shadow: 0 4px 16px rgba(0,0,0,.14); opacity: 0; transition: opacity .1s;
+  }
+  .tip.on { opacity: 1; }
+  .tip b { display: block; margin-bottom: 2px; }
+
+  .method { font-size: 14px; color: var(--text-secondary); }
+  .method li { margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); padding: 20px 0 40px; font-size: 13px; color: var(--text-muted); }
+
+  @media (max-width: 600px) {
+    .dek { font-size: 17px; }
+    .card { padding: 16px; }
+    dl { grid-template-columns: 1fr; gap: 2px; }
+    dt { margin-top: 8px; }
+    .bars { grid-template-columns: 104px 1fr; }
+    .bars .name { font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="draft">Draft for editor review. Data is preliminary and unverified: not for publication.</div>
+
+<div class="wrap">
+  <header>
+    <p class="kicker">Campus childcare · Data draft</p>
+    <h1>Who runs childcare at California's public universities</h1>
+    <p class="dek">UCLA will close its campus childcare program in June 2027. Across all 33 UC and Cal State campuses, who runs childcare depends on the system: student government at most Cal State campuses, the university itself at most UC campuses.</p>
+    <p class="byline">By Jackson Mills · Draft as of Nov. 18, 2026</p>
+  </header>
+
+  <section aria-label="Key numbers">
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section>
+    <h2>Two systems, two models</h2>
+    <p class="sub">Each campus is grouped by who runs its main childcare program. Hover over a bar segment for details, or select a campus to open its full record below.</p>
+    <div class="card">
+      <ul class="legend" id="legend"></ul>
+      <div id="systems"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Licensed childcare slots found so far</h2>
+    <p class="sub">Each bar adds up the state child care licenses found for that campus. The striped part is licensed infant care, the scarcest kind. These are licensed maximums, not enrollment.</p>
+    <div class="card">
+      <ul class="legend" id="legend2"></ul>
+      <div class="bars" id="bars" role="list"></div>
+      <p class="missing" id="missing"></p>
+      <p class="note">Most capacities come from third-party sites that republish California Department of Social Services licensing data. Each still needs to be confirmed in the state's <a href="https://www.ccld.dss.ca.gov/carefacilitysearch/">Care Facility Search</a>.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The UCLA numbers</h2>
+    <p class="sub">The figures UCLA and its critics are arguing over.</p>
+    <div class="tiles">
+      <div class="tile"><div class="num">~220</div><div class="lbl">children in UCLA's Early Care and Education program</div><div class="src"><a href="https://www.aol.com/articles/blow-westside-child-care-ucla-223622000.html">LA Times</a></div></div>
+      <div class="tile"><div class="num">$10.2M</div><div class="lbl">projected 2026-27 operating costs; parent tuition covers about $6.2M</div><div class="src"><a href="https://dailybruin.com/2026/10/04/ucla-childcare-centers-face-projected-9-1-million-deficit-ahead-of-closure/">Daily Bruin</a></div></div>
+      <div class="tile"><div class="num">$9.1M</div><div class="lbl">projected cumulative deficit by the June 30, 2027 closure</div><div class="src"><a href="https://dailybruin.com/2026/10/04/ucla-childcare-centers-face-projected-9-1-million-deficit-ahead-of-closure/">Daily Bruin</a></div></div>
+      <div class="tile"><div class="num">$3,300</div><div class="lbl">monthly infant tuition for UCLA affiliates</div><div class="src"><a href="https://dailybruin.com/2026/10/04/ucla-childcare-centers-face-projected-9-1-million-deficit-ahead-of-closure/">Daily Bruin</a></div></div>
+      <div class="tile"><div class="num">80</div><div class="lbl">union jobs eliminated, per Teamsters Local 2010</div><div class="src"><a href="https://teamsters2010.org/save-childcare-at-ucla/">Teamsters Local 2010</a></div></div>
+    </div>
+  </section>
+
+  <section id="lookup">
+    <h2>Look up a campus</h2>
+    <p class="sub">Every campus record, with programs, operators, funding, recent developments and open reporting questions.</p>
+    <div class="controls">
+      <input id="q" type="search" placeholder="Search campuses, operators, programs" aria-label="Search campuses">
+      <select id="fs" aria-label="Filter by system"><option value="">All systems</option><option value="UC">UC</option><option value="CSU">CSU</option></select>
+      <select id="fg" aria-label="Filter by operator"><option value="">All operators</option></select>
+    </div>
+    <p class="count-line" id="countline"></p>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section>
+    <h2>About this data</h2>
+    <ul class="method">
+      <li>Compiled from campus websites, student-government records, state licensing data, U.S. Education Department grant lists and news coverage, as of Nov. 6, 2026.</li>
+      <li>"Student government or campus nonprofit" includes Associated Students organizations and campus auxiliaries such as Fresno State Programs for Children.</li>
+      <li>Campuses are grouped by who runs their <em>main</em> program. Some have more than one, such as SF State's student-run center and its faculty-focused Children's Campus.</li>
+      <li>Licensed capacity is incomplete: licenses have not yet been found for many campuses, and some listings disagree.</li>
+      <li>Nothing here has been confirmed with the campuses yet. Every record is a starting point for reporting.</li>
+    </ul>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">Draft by Jackson Mills for editor review. Sources are linked in each campus record.</div>
+</footer>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DATA = [{"system": "UC", "key": "UC Berkeley", "name": "UC Berkeley", "program": "Early Childhood Education Program (ECEP): 5 centers in Berkeley and Albany", "type": "University-run", "group": "university", "operator": "UC Berkeley Residential & Student Service Programs", "ages": "3 months to pre-K", "size": "250+ children (program); 260+ in a job posting", "priority": "UC affiliates; reserved subsidized spaces for student parents", "state": "Yes: state subsidy for eligible student parents", "ccampis": "Student Parent Center CCAMPIS grant, 2025-26 services", "news": "Bright Horizons back-up care contract for student parents", "leads": "Request ECEP budget and campus subsidy history; compare with UCLA ECE", "confidence": "Medium", "sources": ["https://ece.berkeley.edu/", "https://studentparents.berkeley.edu/programs-services/2025-2026-ccampis-services-student-parents", "https://backupchildcare.berkeley.edu/faqs/"], "closing": false, "cap": null}, {"system": "UC", "key": "UC Davis", "name": "UC Davis", "program": "Early Childhood Lab School (academic); Hutchison CDC; Willow Bend and West Orchard early learning programs; Bright Path CDC at UC Davis Health", "type": "Mixed: mostly contracted", "group": "contract", "operator": "Bright Horizons (Hutchison, Bright Path); third-party vendor (Willow Bend, West Orchard); Dept. of Human Ecology (Lab School)", "ages": "Infants to pre-K (summer school-age at Hutchison)", "size": "Hutchison 105 FTE; Lab School ~70 part-time; Bright Path 214 (~70 affiliate slots)", "priority": "UC affiliates; Lab School CCAMPIS spots for student parents", "state": "Not confirmed", "ccampis": "CCAMPIS renewal pending for 2025-26; site said care would not be subsidized meanwhile", "news": "Most on-campus slots run by outside vendors", "leads": "Did CCAMPIS renew? What does UC Davis pay vendors (rent, construction subsidies)?", "confidence": "Medium", "sources": ["https://worklife-wellness.ucdavis.edu/node/4691", "https://trc.ucdavis.edu/services/student-parent/ccampis", "https://hr.ucdavis.edu/node/9541", "https://www.brighthorizons.com/newsroom/archive/hutchison-child-care-center-turns-10"], "closing": false, "cap": {"infant": 12, "other": 64, "licenses": 2}}, {"system": "UC", "key": "UC Irvine", "name": "UC Irvine", "program": "Child Care Services: Infant Toddler Center, Children's Center, Early Childhood Education Center, Verano Preschool, Extended Day Center", "type": "University-run", "group": "university", "operator": "UCI Student Affairs, Child Care Services", "ages": "3 months to 12 years", "size": "5 centers (capacity not published)", "priority": "UCI affiliates; subsidized care for UCI students at 3 centers", "state": "Yes: subsidized care for students (separate subsidized-family policies)", "ccampis": "Not found", "news": "2025-26 tuition: Infant Toddler $2,550/mo (3-24 mo); Children's Center $1,850/mo full time", "leads": "Pull licensed capacity for all 5 licenses; tuition trend vs. UCLA", "confidence": "Medium", "sources": ["https://childcare.uci.edu/wp-content/uploads/sites/10/2024/11/Parent-Handbook-112724-1.pdf", "https://childcare.uci.edu/wp-content/uploads/sites/10/2025/06/Tuition-Rates-25-26-copy.pdf", "https://oeod.uci.edu/parenting/childcare.php"], "closing": false, "cap": null}, {"system": "UC", "key": "UCLA", "name": "UCLA", "program": "Early Care and Education (ECE): Krieger Center, University Village Center; University Parents Nursery School (UPNS)", "type": "University-run (closing)", "group": "university", "operator": "UCLA School of Education & Information Studies", "ages": "Infants to preschool", "size": "~220 children (LA Times); University Village ~115", "priority": "UCLA faculty, staff, students; community when space allows", "state": "Yes: CDE and CDSS tuition subsidies for low-income families", "ccampis": "Not found", "news": "Closing June 30, 2027; Fernald closed Sept. 2025; $10.2M 2026-27 expenses; $9.1M projected cumulative deficit", "leads": "Campus subsidy history; Bright Horizons contract; abuse-case liability costs; UCPD 5-year notice", "confidence": "High", "sources": ["https://ece.ucla.edu/faqs", "https://dailybruin.com/2026/10/04/ucla-childcare-centers-face-projected-9-1-million-deficit-ahead-of-closure/", "https://dailybruin.com/2026/10/08/ucla-academic-senate-calls-on-administration-to-keep-childcare-centers-open/"], "closing": true, "cap": {"infant": 25, "other": 212, "licenses": 3}}, {"system": "UC", "key": "UC Merced", "name": "UC Merced", "program": "Early Childhood Education Center (ECEC)", "type": "Campus-affiliated (confirm operator)", "group": "mixed", "operator": "To confirm", "ages": "6 weeks to 5 years", "size": "Licensed 69 (aggregator)", "priority": "UC Merced students, staff, faculty; community", "state": "Not confirmed", "ccampis": "FY2026 new award: $500,000", "news": "New CCAMPIS award in a year with far fewer awards", "leads": "What does the $500K fund? Waitlist size?", "confidence": "Medium", "sources": ["https://www.ucmerced.edu/node/133", "https://www.ed.gov/media/document/fy-2026-ccampis-final-awards-114713.pdf"], "closing": false, "cap": {"infant": 0, "other": 69, "licenses": 1}}, {"system": "UC", "key": "UC Riverside", "name": "UC Riverside", "program": "Center for Early Childhood Education (CECE) / Early Childhood Services: two Child Development Centers", "type": "University-run", "group": "university", "operator": "UC Riverside Early Childhood Services", "ages": "Infants to kindergarten", "size": "Licensed 220 + 54 infant (aggregator)", "priority": "UCR students, faculty, staff", "state": "Not confirmed", "ccampis": "Not found", "news": "Aggregator inspection summaries show substantiated complaints and Type A citations; one listing marked closed", "leads": "Pull CDSS inspection reports for both licenses; confirm license status", "confidence": "Medium", "sources": ["https://cece.ucr.edu/", "https://readyrule.com/daycare/334802965-uc-riverside-child-development-center", "https://daycaregrades.com/daycare/california/riverside/uc-riverside-child-development-center-riverside"], "closing": false, "cap": {"infant": 54, "other": 220, "licenses": 2}}, {"system": "UC", "key": "UC San Diego", "name": "UC San Diego", "program": "Early Childhood Education Center (ECEC)", "type": "University-run", "group": "university", "operator": "UC San Diego (self-operated)", "ages": "3 months to kindergarten", "size": "230+ children; licensed 232 (aggregator)", "priority": "Full-time students, faculty, staff; limited non-affiliates", "state": "Not confirmed", "ccampis": "Not found", "news": "Largest university-run center in the dataset", "leads": "Budget and campus subsidy; how it survives where UCLA's didn't", "confidence": "Medium", "sources": ["https://child.ucsd.edu/program/ecec.html", "https://www.edjoin.org/Home/JobPosting/1838444", "https://daycarepath.com/daycare/ucsd-early-childhood-education-center-main-site-la-jolla"], "closing": false, "cap": {"infant": 0, "other": 232, "licenses": 1}}, {"system": "UC", "key": "UC Santa Barbara", "name": "UC Santa Barbara", "program": "Early Childhood Care & Education Services: Orfalea Family Children's Center, University Children's Center", "type": "University-run", "group": "university", "operator": "UCSB Student Affairs, ECCES", "ages": "3 months to 5 years", "size": "300+ children a year; 245-person waitlist reported", "priority": "Students, faculty, staff; limited community", "state": "Yes (job posting references state contracting agencies)", "ccampis": "Not found", "news": "Large waitlist reported by Daily Nexus", "leads": "Current waitlist; student vs. faculty share", "confidence": "Medium", "sources": ["https://childrenscenter.sa.ucsb.edu", "https://dailynexus.com/?p=109394"], "closing": false, "cap": null}, {"system": "UC", "key": "UC Santa Cruz", "name": "UC Santa Cruz", "program": "Early Education Center (new, 2026); formerly Early Education Services", "type": "University-run", "group": "university", "operator": "UCSC Colleges, Housing & Educational Services", "ages": "3 months to 2nd grade (after-school)", "size": "Up to 140 children (new center); ~50 before", "priority": "Current families and student parents first, then faculty and staff", "state": "Yes: CDE Title 5 contracts", "ccampis": "Not found", "news": "Kept in-house after 2019 privatization fight; new center opening 2026; Bright Horizons back-up care", "leads": "Total cost; $17.5M figure cited by UCLA Faculty Association; opening date and enrollment", "confidence": "High", "sources": ["https://www.ucsc.edu/?p=2382", "https://news.ucsc.edu/?p=54084", "https://news.ucsc.edu/2025/09/new_child_care_center_updates/"], "closing": false, "cap": null}, {"system": "UC", "key": "UCSF (graduate/health)", "name": "UCSF (graduate/health)", "program": "Four centers incl. University Child Care Center at Mission Bay", "type": "Contracted provider", "group": "contract", "operator": "Bright Horizons (since 2006)", "ages": "Infants to 6 years", "size": "Mission Bay 272-296 children; 4 centers", "priority": "UCSF affiliates", "state": "Not confirmed", "ccampis": "Not found", "news": "Fully outsourced model; useful contrast to UCLA", "leads": "Contract terms and campus subsidy", "confidence": "Medium", "sources": ["https://campuslifeserviceshome.ucsf.edu/node/3021", "https://campuslifeserviceshome.ucsf.edu/node/3596"], "closing": false, "cap": null}, {"system": "CSU", "key": "Bakersfield", "name": "CSU Bakersfield", "program": "Cal Ivy Prep at CSUB (former CSUB Children's Center)", "type": "Contracted provider", "group": "contract", "operator": "California Ivy League Preparatory Academy (licensee: Foundation Financial Corp)", "ages": "6 weeks to 5 years", "size": "Licensed 79 + 18 infant (aggregator)", "priority": "CSUB students may get a discount", "state": "Not confirmed", "ccampis": "Not found", "news": "University center closed 2+ years during COVID; private operator took over Oct. 2022", "leads": "Contract terms; how many CSUB student families enrolled vs. community", "confidence": "Medium", "sources": ["https://news.csub.edu/childrens-center-at-csub-reopens", "https://csub.edu/childrenscenter"], "closing": false, "cap": {"infant": 18, "other": 79, "licenses": 2}}, {"system": "CSU", "key": "Channel Islands", "name": "CSU Channel Islands", "program": "None yet: Early Childhood Care and Education Center (ECCEC) in development", "type": "None (planned)", "group": "none", "operator": "CSUCI", "ages": "Planned 6 weeks to 5 years", "size": "Planned ~100 children initially; ~1/3 for farmworker families", "priority": "Students, employees, farmworker families (planned)", "state": "n/a", "ccampis": "n/a", "news": "Funding pieced together: $5M state (2019-20), $5M Ventura County (2023), $1.5M developer, $5M state (2025)", "leads": "Total cost (~$25M early estimate) vs. money raised; opening date", "confidence": "Medium", "sources": ["https://education.csuci.edu/earlychildhood-center/", "https://news.venturacounty.gov/en/?p=2356", "https://pacbiztimes.com/?p=53769"], "closing": false, "cap": null}, {"system": "CSU", "key": "Chico", "name": "CSU Chico", "program": "Associated Students Child Development Lab (ASCDL)", "type": "Student government (AS)", "group": "student", "operator": "Associated Students of CSU, Chico", "ages": "2 months to 5 years", "size": "Licensed 85 for ages 2-5 (handbook)", "priority": "Student parents; income-eligible families next", "state": "Not confirmed", "ccampis": "FY2026 new award: $331,001 (Chico State Enterprises)", "news": "Repeated calls for income-eligible student-parent applications", "leads": "Waitlist; what CCAMPIS money funds", "confidence": "Medium", "sources": ["https://as.csuchico.edu/assets/resources/Department/Child-Development/1-ASCDL2025_F-A-M-I-L-Y-H-A-N-D-B-O-O-K-Summer.pdf", "https://www.csuchico.edu/announcements/2026-04/26-04-23-associated-students-child-development-lab-accepting-applications.shtml"], "closing": false, "cap": null}, {"system": "CSU", "key": "Dominguez Hills", "name": "CSU Dominguez Hills", "program": "ASI Child Development Center (merged with Infant Toddler Development Center)", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students, Inc.", "ages": "2.5 to 5 years (catalog); infant-toddler merged in", "size": "65 children enrolled, at capacity (2023)", "priority": "Student parents; ~75% of children from student parents", "state": "Not confirmed", "ccampis": "Not found (held CCAMPIS in 2014-15)", "news": "Merger of two campus programs under one director", "leads": "Capacity vs. waitlist", "confidence": "Medium", "sources": ["https://news.csudh.edu/naeyc/", "https://csudh.edu/class-schedule/sp25/student-support-services/child-development-center-cdc-"], "closing": false, "cap": null}, {"system": "CSU", "key": "East Bay", "name": "CSU East Bay", "program": "None on campus", "type": "None", "group": "none", "operator": "n/a", "ages": "n/a", "size": "n/a", "priority": "n/a", "state": "n/a", "ccampis": "n/a", "news": "ASI-funded center closed Aug. 2011 after losing $300K+ over two years on an outside contract; only 25 users were CSUEB-affiliated", "leads": "Has any replacement been studied since 2011?", "confidence": "High", "sources": ["https://thepioneeronline.com/4928/campus/on-campus-daycare-terminated/"], "closing": false, "cap": null}, {"system": "CSU", "key": "Fresno", "name": "CSU Fresno", "program": "Fresno State Programs for Children: Campus Children's Infant/Toddler Center, Campus Children's Preschool Center, Joyce M. Huggins Early Education Center", "type": "Auxiliary nonprofit", "group": "student", "operator": "Fresno State Programs for Children, Inc.", "ages": "3 months to 12 years", "size": "200+ children a year; Huggins licensed 94 + 28 infant", "priority": "Student families meeting state eligibility first", "state": "Yes: funded by the State Department of Education", "ccampis": "Not found", "news": "Expansion aimed at faculty and staff", "leads": "Student vs. employee share after expansion", "confidence": "Medium", "sources": ["https://academics.fresnostate.edu/pfc/about-us/", "https://academics.fresnostate.edu/pfc/documents/pfc-handbook-2025.pdf"], "closing": false, "cap": {"infant": 0, "other": 94, "licenses": 1}}, {"system": "CSU", "key": "Fullerton", "name": "CSU Fullerton", "program": "ASI Children's Center", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students Inc., CSUF", "ages": "4 months to 5 years", "size": "Not published; 'highly impacted' (Daily Titan)", "priority": "CSUF students; 20 spaces for faculty and staff", "state": "Yes: CSPP and CCTR (2017 minutes)", "ccampis": "Held CCAMPIS in 2012-13 (current status not found)", "news": "2017 minutes say center returned state/federal funds for lack of eligible families; 2026-27 fee resolution cites fiscal obstacles incl. minimum wage", "leads": "Pull ASI budgets and fee resolutions 2017-2027", "confidence": "Medium", "sources": ["https://asi.fullerton.edu/cc_2017_11_17_min", "https://asi.fullerton.edu/wp-content/uploads/2025/11/A-Resolution-to-Approve-the-Childrens-Center-Fees-2026-27.pdf"], "closing": false, "cap": null}, {"system": "CSU", "key": "Cal Poly Humboldt", "name": "Cal Poly Humboldt", "program": "Children's Center; Child Development Lab (both at Trinity Early Learning Center)", "type": "University-run", "group": "university", "operator": "Cal Poly Humboldt", "ages": "Infants to preschool", "size": "86 children (2019); waitlist only for Spring 2026", "priority": "Students, staff, faculty", "state": "Not confirmed", "ccampis": "4-year CCAMPIS award (2021)", "news": "New Trinity Early Learning Center opened 2024; student paper headline about cuts to child care services (undated)", "leads": "Find and date the 'Humboldt cuts child care services' story", "confidence": "Medium", "sources": ["https://now.humboldt.edu/news/week-young-child-new-hub-learning", "https://childrencenter.humboldt.edu/node/858"], "closing": false, "cap": null}, {"system": "CSU", "key": "Long Beach", "name": "CSU Long Beach", "program": "Isabel Patterson Child Development Center (IPCDC); Child and Family Center (College of Health & Human Services)", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students, Inc. (IPCDC); CHHS (Child and Family Center)", "ages": "6 months through 2nd grade", "size": "28 infant/toddler + 100 preschool + 40 school-age FTE; ~230 children per semester", "priority": "CSULB students first, then faculty/staff, alumni, community", "state": "Yes: CDSS CCTR $376,421 (FY22-23); CDE", "ccampis": "Held CCAMPIS in 2012-15 (current status not found)", "news": "$3.4M federal earmark (2024) for electrical and HVAC; Child and Family Center reopened May 2026 at double size", "leads": "Get ASI budget and deferred-maintenance list; who the CFC serves", "confidence": "High", "sources": ["https://asicsulb.org/corporate/discover/child-development-center/about-us", "https://www.csulb.edu/beach-2030/article/34-million-grant-for-isabel-patterson-child-development-center-illustrates-power", "https://lbcurrent.com/?p=75212", "https://www.csulb.edu/college-of-health-human-services/child-and-family-center"], "closing": false, "cap": null}, {"system": "CSU", "key": "Los Angeles", "name": "CSU Los Angeles", "program": "Anna Bing Arnold Children's Center", "type": "Student government (ASI)", "group": "student", "operator": "ASI-sponsored nonprofit", "ages": "6 months to 5 years", "size": "~100 children daily; licensed 102 + 18 infant (aggregator)", "priority": "Cal State LA students first", "state": "Yes: CDE grants", "ccampis": "Held CCAMPIS in 2014-15 (current status not found); U.S. ED grants listed as a sponsor", "news": "ASI funding ~7% of budget; 50% of families were students (fall 2022)", "leads": "How the other 93% is funded", "confidence": "High", "sources": ["https://asicalstatela.org/sites/default/files/content/attachments/2025/04/asi-powerpoint-2024-25-childrens-center.pdf", "https://asicalstatela.org/sites/default/files/content/attachments/2023/01/asi-report-fall-2022childrens-center.pdf"], "closing": false, "cap": {"infant": 18, "other": 102, "licenses": 2}}, {"system": "CSU", "key": "Maritime Academy", "name": "Cal Maritime", "program": "None found", "type": "None", "group": "none", "operator": "n/a", "ages": "n/a", "size": "n/a", "priority": "n/a", "state": "n/a", "ccampis": "n/a", "news": "Campus merged into Cal Poly San Luis Obispo in 2025", "leads": "Confirm no program", "confidence": "Low", "sources": [], "closing": false, "cap": null}, {"system": "CSU", "key": "Monterey Bay", "name": "CSU Monterey Bay", "program": "CSUMB Child Development Center", "type": "Contracted provider", "group": "contract", "operator": "Early Development Services (EDS), via University Corporation at Monterey Bay", "ages": "Infants to preschool", "size": "Licensed 48", "priority": "CSUMB students first, then employees, community", "state": "Not confirmed", "ccampis": "Not found", "news": "Outsourced since March 2009", "leads": "Contract terms; student share", "confidence": "Medium", "sources": ["https://csumb.edu/departments/corporation/services/childcare-center/", "https://csumb.edu/studentlife/child-care-center"], "closing": false, "cap": {"infant": 0, "other": 56, "licenses": 2}}, {"system": "CSU", "key": "Northridge", "name": "CSU Northridge", "program": "AS Children's Center (plus academic Child & Family Studies Center)", "type": "Student government (AS)", "group": "student", "operator": "Associated Students, CSUN", "ages": "18 months to 5 years", "size": "Licensed 136", "priority": "Student-parent families first", "state": "Yes: state-funded since 1976 (CDE subsidies)", "ccampis": "Held CCAMPIS in 2012-13 (current status not found)", "news": "No infant care at AS center", "leads": "Infant-care gap; waitlist", "confidence": "High", "sources": ["https://catalog.csun.edu/groups/childrens-center/", "https://csun.edu/as/childrens-center/about"], "closing": false, "cap": {"infant": 0, "other": 136, "licenses": 1}}, {"system": "CSU", "key": "Cal Poly Pomona", "name": "Cal Poly Pomona", "program": "Cal Poly Pomona Children's Center", "type": "Student government (ASI)", "group": "student", "operator": "ASI and Cal Poly Pomona (joint)", "ages": "Preschool", "size": "Licensed 71 (aggregator)", "priority": "Student parents", "state": "Not confirmed", "ccampis": "Held CCAMPIS in 2012-13 (current status not found)", "news": "", "leads": "Confirm ages and capacity", "confidence": "Low", "sources": ["https://asi.cpp.edu/services/child-care/children-center"], "closing": false, "cap": {"infant": 0, "other": 71, "licenses": 1}}, {"system": "CSU", "key": "Sacramento", "name": "CSU Sacramento", "program": "ASI Children's Center", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students CSUS Children's Center, Inc.", "ages": "6 months to kindergarten", "size": "Licensed 126 + 57 infant (aggregator)", "priority": "Sac State students first", "state": "Not confirmed", "ccampis": "CCAMPIS grant (2022)", "news": "$1M state earmark (2022) for playground and subsidies", "leads": "Aggregator shows a substantiated 2025 complaint; pull CDSS report", "confidence": "Medium", "sources": ["https://asi.csus.edu/asi-childrens-center", "https://www.csus.edu/news/newsroom/stories/2022/9/childrens-center-earmark.html"], "closing": false, "cap": {"infant": 57, "other": 126, "licenses": 2}}, {"system": "CSU", "key": "San Bernardino", "name": "CSU San Bernardino", "program": "Children's Center", "type": "Auxiliary / student government (confirm)", "group": "student", "operator": "ASI; CCAMPIS held by University Enterprises Corp.", "ages": "3 to 5 years", "size": "Not published", "priority": "Students; ~75% of families are student parents (2022)", "state": "Not confirmed", "ccampis": "FY2026 new award: $885,476 (University Enterprises Corp.)", "news": "Largest California CCAMPIS award found for FY2026", "leads": "What the award funds; no infant care", "confidence": "Medium", "sources": ["https://www.csusb.edu/sites/default/files/upload/file/BoD%20Minutes%20April%2011%2C%202022.pdf", "https://www.ed.gov/media/document/fy-2026-ccampis-final-awards-114713.pdf"], "closing": false, "cap": null}, {"system": "CSU", "key": "San Diego State", "name": "San Diego State", "program": "Associated Students Children's Center", "type": "Student government (AS)", "group": "student", "operator": "Associated Students", "ages": "6 months to pre-K", "size": "Licensed 136 + 64 infant (aggregator)", "priority": "Students, faculty, staff, alumni, community", "state": "Not confirmed", "ccampis": "Not found", "news": "", "leads": "Student vs. faculty share", "confidence": "Medium", "sources": ["https://readyrule.com/daycare/370805130-associated-students-child-care-center", "https://daycarepath.com/daycare/associated-students-child-care-center-infant-ctr-san-diego"], "closing": false, "cap": {"infant": 64, "other": 136, "licenses": 2}}, {"system": "CSU", "key": "San Francisco State", "name": "San Francisco State", "program": "AS Children's Center; Children's Campus (College of Health & Human Services)", "type": "Mixed: student government + university", "group": "mixed", "operator": "ASI of SF State (Children's Center); Marian Wright Edelman Institute (Children's Campus)", "ages": "6 months to 5 years", "size": "AS: licensed 60 + 40 infant; Children's Campus ~85 children", "priority": "AS center: students; Children's Campus: primarily faculty and staff", "state": "Not confirmed", "ccampis": "Not found", "news": "Two-track system: one center for students, one mainly for employees", "leads": "Compare cost, quality and waitlists across the two", "confidence": "Medium", "sources": ["https://schoolscope.co/ca/preschool/associated-students-childrens-center-infant-504941", "https://childrenscampuscheckin.sfsu.edu", "https://sfsu.edu/news/2009/spring/19.html"], "closing": false, "cap": {"infant": 76, "other": 102, "licenses": 4}}, {"system": "CSU", "key": "San José State", "name": "San José State", "program": "AS Child Development Center", "type": "Student government (AS)", "group": "student", "operator": "Associated Students, SJSU", "ages": "4 months to 5 years", "size": "Up to 90 children; licensed 72 + 44 infant", "priority": "Low-income student families first; employees pay market rate", "state": "Yes: CDE and CDSS", "ccampis": "Funding sources list CCAMPIS", "news": "Funding mix published: AS, CDE, CDSS, parent fees, CCAMPIS, fundraising", "leads": "Good second model alongside CSULB", "confidence": "High", "sources": ["https://www.sjsu.edu/as/departments/child-development-center/index.php", "https://gcp-web.sjsu.edu/as/departments/child-development-center/parent-resources.php"], "closing": false, "cap": {"infant": 44, "other": 72, "licenses": 2}}, {"system": "CSU", "key": "Cal Poly San Luis Obispo", "name": "Cal Poly San Luis Obispo", "program": "Orfalea Family and ASI Children's Center", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students, Inc.", "ages": "4 months to transitional kindergarten", "size": "Licensed 132", "priority": "Students, then faculty/staff, alumni, community", "state": "Not confirmed", "ccampis": "Not found", "news": "Student fee referendums in 1990 and 1995 fund it", "leads": "Effect of absorbing Maritime Academy", "confidence": "Medium", "sources": ["https://www.asi.calpoly.edu/facilities/childrens-center-facilities/", "https://www.asi.calpoly.edu/childrens-center/enrollment/"], "closing": false, "cap": null}, {"system": "CSU", "key": "San Marcos", "name": "CSU San Marcos", "program": "Center for Children and Families (CCF)", "type": "Student government (ASI)", "group": "student", "operator": "Associated Students, Inc.", "ages": "5 and under", "size": "Capacity 162; served 126 (undated page)", "priority": "Students, faculty, staff, community", "state": "Not confirmed", "ccampis": "Held CCAMPIS in 2012-14 (current status not found)", "news": "Opened 2007; supported by a student fee", "leads": "Why it runs below capacity", "confidence": "Low", "sources": ["https://csusm.edu/ccf/history.html", "https://csusm.edu/ccf/aboutus/index.html"], "closing": false, "cap": null}, {"system": "CSU", "key": "Sonoma", "name": "CSU Sonoma", "program": "The Children's School (Child Development Laboratory)", "type": "Student government (AS)", "group": "student", "operator": "Sonoma State Associated Students", "ages": "1 to 5 years", "size": "Licensed 61 (plus infant license)", "priority": "Students, staff, faculty", "state": "Yes: CDE contracts", "ccampis": "CCAMPIS grant (period not stated)", "news": "", "leads": "Confirm CCAMPIS period", "confidence": "Medium", "sources": ["https://childrens-school.sonoma.edu/", "https://orsp.sonoma.edu/node/3471"], "closing": false, "cap": {"infant": 0, "other": 61, "licenses": 1}}, {"system": "CSU", "key": "Stanislaus", "name": "CSU Stanislaus", "program": "Child Development Center", "type": "University-run", "group": "university", "operator": "Stanislaus State", "ages": "2 months to 5 years", "size": "Licensed 64 (aggregator; other listings differ)", "priority": "University students", "state": "Not confirmed", "ccampis": "Not found", "news": "Purpose-built 19,976 sq ft center", "leads": "Confirm licensed capacity", "confidence": "Low", "sources": ["https://www.csustan.edu/news/applications-being-accepted-csu-stanislaus-child-development-center", "https://readyrule.com/daycare/500317738-ca-state-university-stanislaus-cdc"], "closing": false, "cap": {"infant": 0, "other": 64, "licenses": 1}}];
+
+const GROUPS = [
+  { id: "university", label: "University-run" },
+  { id: "student",    label: "Student government or campus nonprofit" },
+  { id: "contract",   label: "Private contractor" },
+  { id: "mixed",      label: "Mixed or unconfirmed" },
+  { id: "none",       label: "No campus center" },
+];
+const G = Object.fromEntries(GROUPS.map(g => [g.id, g]));
+const SYSTEMS = [
+  { id: "UC",  label: "University of California" },
+  { id: "CSU", label: "California State University" },
+];
+
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+const by = (sys, grp) => DATA.filter(d => d.system === sys && (!grp || d.group === grp));
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+/* tooltip */
+const tip = $("#tip");
+function showTip(e, html) {
+  tip.innerHTML = html;
+  tip.classList.add("on");
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
+}
+function tipFor(node, htmlFn) {
+  node.addEventListener("pointermove", e => showTip(e, htmlFn()));
+  node.addEventListener("pointerleave", () => tip.classList.remove("on"));
+  node.addEventListener("focus", () => {
+    const r = node.getBoundingClientRect();
+    showTip({ clientX: r.left + r.width / 2, clientY: r.bottom }, htmlFn());
+  });
+  node.addEventListener("blur", () => tip.classList.remove("on"));
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* tiles */
+(function tiles() {
+  const csuStudent = by("CSU", "student").length;
+  const ucUni = by("UC", "university").length;
+  const outsourced = DATA.filter(d => d.group === "contract").length;
+  const none = DATA.filter(d => d.group === "none").length;
+  const t = [
+    [`${csuStudent} of ${by("CSU").length}`, "Cal State campuses where student government or a campus nonprofit runs childcare"],
+    [`${ucUni} of ${by("UC").length}`, "UC campuses where the university runs childcare itself, including UCLA"],
+    [`${outsourced}`, "campuses that rely mainly on a private contractor, such as Bright Horizons"],
+    [`${none}`, "Cal State campuses with no campus center: East Bay, Maritime and Channel Islands (one planned)"],
+  ];
+  const box = $("#tiles");
+  for (const [n, l] of t) box.append(el("div", { class: "tile" }, el("div", { class: "num", text: n }), el("div", { class: "lbl", text: l })));
+})();
+
+/* legends */
+function legend(target, extra) {
+  const ul = $(target);
+  for (const g of GROUPS) ul.append(el("li", {}, el("span", { class: `sw ${g.id}`, "aria-hidden": "true" }), g.label));
+  if (extra) ul.append(extra);
+}
+legend("#legend");
+
+/* system composition */
+(function systems() {
+  const root = $("#systems");
+  for (const s of SYSTEMS) {
+    const all = by(s.id);
+    const stack = el("div", { class: "stack", role: "img", "aria-label": `${s.label}: ` + GROUPS.map(g => `${by(s.id, g.id).length} ${g.label}`).join(", ") });
+    const groups = el("div", { class: "groups" });
+    for (const g of GROUPS) {
+      const list = by(s.id, g.id);
+      if (!list.length) continue;
+      const seg = el("div", { class: `seg ${g.id}`, tabindex: "0", style: `flex:${list.length} 1 0` }, String(list.length));
+      tipFor(seg, () => `<b>${esc(g.label)}</b>${list.length} of ${all.length} ${s.id} campuses<br>${list.map(d => esc(d.name)).join(", ")}`);
+      stack.append(seg);
+      const chips = el("div", { class: "chips" });
+      for (const d of list) {
+        chips.append(el("button", { class: "chip", type: "button", onclick: () => openCampus(d) },
+          d.name, d.closing ? el("span", { class: "flag", text: " · closing" }) : null));
+      }
+      groups.append(el("div", { class: "group" },
+        el("h4", {}, el("span", { class: `sw ${g.id}`, "aria-hidden": "true" }), el("span", {}, g.label + " ", el("span", { class: "count", text: `(${list.length})` }))),
+        chips));
+    }
+    root.append(el("div", { class: "sys" },
+      el("div", { class: "sys-head" }, el("h3", { text: s.label }), el("span", { text: `${all.length} campuses` })),
+      stack, groups));
+  }
+})();
+
+/* capacity bars */
+(function bars() {
+  legend("#legend2");
+  const ul = $("#legend2");
+  // only groups with bars, plus the infant texture
+  const withCap = DATA.filter(d => d.cap);
+  const present = new Set(withCap.map(d => d.group));
+  [...ul.children].forEach((li, i) => { if (!present.has(GROUPS[i].id)) li.remove(); });
+  ul.append(el("li", {}, el("span", { class: "sw infant", "aria-hidden": "true" }), "Striped: infant slots"));
+
+  const rows = withCap.map(d => ({ d, inf: d.cap.infant, oth: d.cap.other, tot: d.cap.infant + d.cap.other }))
+    .sort((a, b) => b.tot - a.tot);
+  const max = Math.ceil(Math.max(...rows.map(r => r.tot)) / 50) * 50;
+  const root = $("#bars");
+  for (const r of rows) {
+    const name = el("div", { class: "name", title: r.d.name }, r.d.name, r.d.closing ? el("span", { class: "flag", text: " closing" }) : null);
+    const bar = el("div", { class: `bar ${r.d.group}`, style: `width:${(r.tot / max) * 100}%` });
+    if (r.oth) bar.append(el("span", { style: `flex:${r.oth} 1 0` }));
+    if (r.inf) bar.append(el("span", { class: "inf", style: `flex:${r.inf} 1 0` }));
+    const wrap = el("div", { class: "track" }, bar, el("span", { class: "val", text: r.tot.toLocaleString() }));
+    wrap.setAttribute("tabindex", "0");
+    wrap.setAttribute("role", "listitem");
+    wrap.setAttribute("aria-label", `${r.d.name}: ${r.tot} licensed slots, ${r.inf} infant`);
+    tipFor(wrap, () => `<b>${esc(r.d.name)}</b>${r.tot} licensed slots found<br>${r.inf} infant · ${r.oth} older children<br>${r.d.cap.licenses} license${r.d.cap.licenses > 1 ? "s" : ""} · ${esc(G[r.d.group].label)}`);
+    wrap.addEventListener("click", () => openCampus(r.d));
+    wrap.style.cursor = "pointer";
+    root.append(name, wrap);
+  }
+  const ticks = [0, max / 2, max];
+  root.append(el("div", { class: "axis", "aria-hidden": "true" }, ...ticks.map(t => el("span", { text: t.toLocaleString() }))));
+  const total = rows.reduce((a, r) => a + r.tot, 0);
+  const missing = DATA.filter(d => !d.cap && d.group !== "none").map(d => d.name);
+  $("#missing").textContent = `${total.toLocaleString()} licensed slots found across ${rows.length} campuses. Licenses not yet found: ${missing.join(", ")}.`;
+})();
+
+/* lookup */
+const fg = $("#fg");
+for (const g of GROUPS) fg.append(el("option", { value: g.id, text: g.label }));
+
+function field(label, value) {
+  if (!value) return [];
+  return [el("dt", { text: label }), el("dd", {}, value)];
+}
+function sourcesList(urls) {
+  if (!urls.length) return null;
+  const ul = el("ul");
+  for (const u of urls) {
+    let host = u;
+    try { host = new URL(u).hostname.replace(/^www\./, ""); } catch (e) {}
+    ul.append(el("li", {}, el("a", { href: u, target: "_blank", rel: "noopener", text: host })));
+  }
+  return ul;
+}
+function capText(c) {
+  if (!c) return "";
+  return `${c.infant + c.other} licensed slots found (${c.infant} infant) across ${c.licenses} license${c.licenses > 1 ? "s" : ""}`;
+}
+
+const listRoot = $("#list");
+const rows = DATA.slice().sort((a, b) => a.system.localeCompare(b.system) || a.name.localeCompare(b.name)).map(d => {
+  const det = el("details", { id: "c-" + slug(d.name) },
+    el("summary", {},
+      el("span", { class: "cn" }, el("span", { class: `sw ${d.group}`, "aria-hidden": "true" }), d.name,
+        el("span", { class: "cs", text: d.system }), d.closing ? el("span", { class: "flag", style: "color:var(--critical);font-size:12px", text: "Closing June 2027" }) : null),
+      el("span", { class: "ct", text: `${G[d.group].label}${d.operator && d.operator !== "n/a" ? " · " + d.operator : ""}` }),
+      el("span", { class: "chev", "aria-hidden": "true", text: "›" })),
+    el("dl", {},
+      ...field("Program(s)", d.program),
+      ...field("Ages served", d.ages !== "n/a" ? d.ages : ""),
+      ...field("Size as reported", d.size !== "n/a" ? d.size : ""),
+      ...field("Licensed capacity", capText(d.cap)),
+      ...field("Enrollment priority", d.priority !== "n/a" ? d.priority : ""),
+      ...field("State subsidy contracts", d.state !== "n/a" ? d.state : ""),
+      ...field("Federal CCAMPIS grant", d.ccampis !== "n/a" ? d.ccampis : ""),
+      ...field("Recent developments", d.news),
+      ...field("Reporting questions", d.leads),
+      ...field("Confidence", d.confidence),
+      ...field("Sources", sourcesList(d.sources))));
+  det._d = d;
+  det._hay = [d.name, d.key, d.program, d.operator, d.type, d.news, d.system].join(" ").toLowerCase();
+  return det;
+});
+rows.forEach(r => listRoot.append(r));
+
+function filter() {
+  const q = $("#q").value.trim().toLowerCase();
+  const s = $("#fs").value, g = fg.value;
+  let n = 0;
+  for (const r of rows) {
+    const ok = (!q || r._hay.includes(q)) && (!s || r._d.system === s) && (!g || r._d.group === g);
+    r.hidden = !ok;
+    if (ok) n++;
+  }
+  $("#countline").textContent = `Showing ${n} of ${rows.length} campuses`;
+}
+["input", "change"].forEach(ev => { $("#q").addEventListener(ev, filter); $("#fs").addEventListener(ev, filter); fg.addEventListener(ev, filter); });
+filter();
+
+function openCampus(d) {
+  $("#q").value = ""; $("#fs").value = ""; fg.value = ""; filter();
+  const node = document.getElementById("c-" + slug(d.name));
+  node.open = true;
+  node.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  node.classList.remove("flash"); void node.offsetWidth; node.classList.add("flash");
+  node.querySelector("summary").focus({ preventScroll: true });
+}
+</script>
+</body>
+</html>
